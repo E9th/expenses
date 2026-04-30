@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   PlusCircle,
   ChevronLeft,
@@ -10,10 +10,18 @@ import {
   Trash2,
   Calendar,
   CheckCircle2,
+  FileUp,
+  Pencil,
+  Check,
+  X,
+  PieChart,
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 // --- Configuration & Constants ---
-const CATEGORIES = {
+const STORAGE_KEY = 'moneymate-state-v1'
+
+const DEFAULT_CATEGORIES = {
   income: ['เงินเดือน', 'โบนัส', 'รายได้เสริม', 'อื่นๆ'],
   expense: [
     'อาหาร/ของใช้ (CJ, ตลาด)',
@@ -80,6 +88,187 @@ const INITIAL_TRANSACTIONS = [
   },
 ]
 
+const cloneCategories = (categories) => ({
+  income: [...categories.income],
+  expense: [...categories.expense],
+})
+
+const normalizeCategoryName = (value) => value.trim().toLowerCase()
+
+const dedupeCategories = (items) => {
+  const seen = new Set()
+  return items.filter((item) => {
+    const normalized = normalizeCategoryName(item)
+    if (!normalized || seen.has(normalized)) return false
+    seen.add(normalized)
+    return true
+  })
+}
+
+const ensureCategoryList = (items, fallback) => {
+  const cleaned = dedupeCategories(Array.isArray(items) ? items : [])
+  return cleaned.length ? cleaned : [...fallback]
+}
+
+const sanitizeCategories = (categories) => {
+  if (!categories) return cloneCategories(DEFAULT_CATEGORIES)
+  return {
+    income: ensureCategoryList(categories.income, DEFAULT_CATEGORIES.income),
+    expense: ensureCategoryList(categories.expense, DEFAULT_CATEGORIES.expense),
+  }
+}
+
+const ensureLastCategories = (categories, lastCategories) => {
+  const next = {
+    income: lastCategories?.income || categories.income[0],
+    expense: lastCategories?.expense || categories.expense[0],
+  }
+  if (!categories.income.includes(next.income)) next.income = categories.income[0]
+  if (!categories.expense.includes(next.expense)) next.expense = categories.expense[0]
+  return next
+}
+
+const loadStoredState = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+const getInitialState = () => {
+  const stored = loadStoredState()
+  const categories = sanitizeCategories(stored?.categories)
+  const lastCategories = ensureLastCategories(categories, stored?.lastCategories)
+  const transactions = Array.isArray(stored?.transactions) ? stored.transactions : INITIAL_TRANSACTIONS
+  return { categories, lastCategories, transactions }
+}
+
+const formatLocalDate = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const parseDateValue = (value) => {
+  if (!value) return null
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return formatLocalDate(value)
+  }
+  if (typeof value === 'number') {
+    const utcValue = new Date(Math.round((value - 25569) * 86400 * 1000))
+    if (!Number.isNaN(utcValue.getTime())) {
+      const year = utcValue.getUTCFullYear()
+      const month = String(utcValue.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(utcValue.getUTCDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const parts = trimmed.split(/[-/.]/)
+    if (parts.length === 3) {
+      const [first, second, third] = parts
+      if (first.length === 4) {
+        const year = first
+        const month = String(second).padStart(2, '0')
+        const day = String(third).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+      if (third.length === 4) {
+        const year = third
+        const month = String(second).padStart(2, '0')
+        const day = String(first).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+    }
+    const parsed = new Date(trimmed)
+    if (!Number.isNaN(parsed.getTime())) return formatLocalDate(parsed)
+  }
+  return null
+}
+
+const parseAmount = (value) => {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[^0-9.-]/g, '')
+    return Number(cleaned)
+  }
+  return Number.NaN
+}
+
+const parseType = (value) => {
+  if (!value) return null
+  const normalized = value.toString().trim().toLowerCase()
+  if (!normalized) return null
+  if (normalized.includes('income') || normalized.includes('รายรับ') || normalized.includes('รับ')) {
+    return 'income'
+  }
+  if (normalized.includes('expense') || normalized.includes('รายจ่าย') || normalized.includes('จ่าย')) {
+    return 'expense'
+  }
+  return null
+}
+
+const normalizeKey = (value) => value.toString().trim().toLowerCase().replace(/\s+/g, '')
+
+const IMPORT_ALIASES = {
+  date: ['date', 'วันที่', 'วัน', 'transactiondate', 'วันที่ทำรายการ'].map(normalizeKey),
+  type: ['type', 'ประเภท', 'ชนิด', 'ชนิดรายการ', 'รายรับรายจ่าย'].map(normalizeKey),
+  category: ['category', 'หมวดหมู่', 'หมวด'].map(normalizeKey),
+  amount: ['amount', 'ยอด', 'จำนวนเงิน', 'จำนวน', 'value'].map(normalizeKey),
+  note: ['note', 'รายละเอียด', 'โน้ต', 'บันทึก'].map(normalizeKey),
+}
+
+const getValueByAliases = (row, aliases) => {
+  for (const alias of aliases) {
+    if (row[alias] !== undefined && row[alias] !== null && row[alias] !== '') {
+      return row[alias]
+    }
+  }
+  return null
+}
+
+const PIE_COLORS = ['#BA343B', '#D4686E', '#E18B90', '#F0B5B8', '#B04A50', '#8F2D33']
+
+const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
+  const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0
+  return {
+    x: centerX + radius * Math.cos(angleInRadians),
+    y: centerY + radius * Math.sin(angleInRadians),
+  }
+}
+
+const describeArc = (x, y, radius, startAngle, endAngle) => {
+  const start = polarToCartesian(x, y, radius, endAngle)
+  const end = polarToCartesian(x, y, radius, startAngle)
+  const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1'
+  return `M ${x} ${y} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y} Z`
+}
+
+const buildPieSlices = (data, total, colors) => {
+  if (!total) return []
+  let startAngle = 0
+  return data.map((item, index) => {
+    const angle = (item.value / total) * 360
+    const endAngle = startAngle + angle
+    const path = describeArc(100, 100, 90, startAngle, endAngle)
+    const slice = {
+      ...item,
+      path,
+      angle,
+      color: colors[index % colors.length],
+    }
+    startAngle = endAngle
+    return slice
+  })
+}
+
 // --- Decorative Components ---
 const WatercolorBlob = ({ className }) => (
   <svg
@@ -105,24 +294,41 @@ const WatercolorBlob = ({ className }) => (
 
 export default function App() {
   // --- State ---
-  const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS)
-  const [currentMonth, setCurrentMonth] = useState(new Date(2024, 4))
-  const todayIso = new Date().toISOString().split('T')[0]
+  const todayIso = formatLocalDate(new Date())
+  const initialState = useMemo(() => getInitialState(), [])
 
-  // Smart Defaults State
-  const [lastCategories, setLastCategories] = useState({
-    income: CATEGORIES.income[0],
-    expense: CATEGORIES.expense[0],
+  const [transactions, setTransactions] = useState(initialState.transactions)
+  const [categories, setCategories] = useState(initialState.categories)
+  const [lastCategories, setLastCategories] = useState(initialState.lastCategories)
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    if (!initialState.transactions.length) return new Date()
+    const latestDate = initialState.transactions.reduce((latest, current) => {
+      const currentDate = new Date(current.date)
+      return currentDate > latest ? currentDate : latest
+    }, new Date(initialState.transactions[0].date))
+    return new Date(latestDate.getFullYear(), latestDate.getMonth(), 1)
   })
 
+  // Smart Defaults State
   // Form State
   const [formData, setFormData] = useState({
     type: 'expense',
     amount: '',
-    category: CATEGORIES.expense[0],
+    category: initialState.lastCategories.expense,
     date: todayIso,
     note: '',
   })
+
+  // Category Management State
+  const [categoryTab, setCategoryTab] = useState('expense')
+  const [categoryDraft, setCategoryDraft] = useState('')
+  const [editingCategory, setEditingCategory] = useState(null)
+  const [editingValue, setEditingValue] = useState('')
+  const [categoryFeedback, setCategoryFeedback] = useState(null)
+
+  // Import & Chart State
+  const [importStatus, setImportStatus] = useState(null)
+  const [pieFilter, setPieFilter] = useState('all')
 
   // Animation & UX State
   const [deletingId, setDeletingId] = useState(null)
@@ -131,10 +337,14 @@ export default function App() {
 
   // --- Handlers ---
   const handleTypeChange = (type) => {
+    const nextCategory =
+      lastCategories[type] && categories[type].includes(lastCategories[type])
+        ? lastCategories[type]
+        : categories[type][0]
     setFormData((prev) => ({
       ...prev,
       type,
-      category: lastCategories[type],
+      category: nextCategory,
     }))
   }
 
@@ -157,16 +367,21 @@ export default function App() {
       return
     }
 
+    const resolvedCategory = categories[formData.type].includes(formData.category)
+      ? formData.category
+      : categories[formData.type][0]
+
     const newTransaction = {
       id: Date.now().toString(),
       ...formData,
+      category: resolvedCategory,
       amount: Number(formData.amount),
     }
 
     // Update smart defaults
     setLastCategories((prev) => ({
       ...prev,
-      [formData.type]: formData.category,
+      [formData.type]: resolvedCategory,
     }))
 
     setTransactions((prev) =>
@@ -196,6 +411,215 @@ export default function App() {
       newDate.setMonth(prev.getMonth() + offset)
       return newDate
     })
+  }
+
+  const handleAddCategory = () => {
+    const name = categoryDraft.trim()
+    if (!name) {
+      setCategoryFeedback({ type: 'error', text: 'กรุณาใส่ชื่อหมวดหมู่ก่อนนะ' })
+      return
+    }
+    const normalized = normalizeCategoryName(name)
+    if (categories[categoryTab].some((item) => normalizeCategoryName(item) === normalized)) {
+      setCategoryFeedback({ type: 'error', text: 'มีหมวดหมู่นี้อยู่แล้ว' })
+      return
+    }
+
+    setCategories((prev) => ({
+      ...prev,
+      [categoryTab]: [...prev[categoryTab], name],
+    }))
+    setCategoryDraft('')
+    setCategoryFeedback({ type: 'success', text: 'เพิ่มหมวดหมู่ใหม่แล้ว' })
+  }
+
+  const handleStartEditCategory = (type, name) => {
+    setEditingCategory({ type, name })
+    setEditingValue(name)
+    setCategoryFeedback(null)
+  }
+
+  const handleCancelEditCategory = () => {
+    setEditingCategory(null)
+    setEditingValue('')
+  }
+
+  const handleSaveEditCategory = () => {
+    if (!editingCategory) return
+    const nextName = editingValue.trim()
+    if (!nextName) {
+      setCategoryFeedback({ type: 'error', text: 'ชื่อใหม่ห้ามว่างนะ' })
+      return
+    }
+    const normalized = normalizeCategoryName(nextName)
+    const list = categories[editingCategory.type]
+    if (
+      list.some(
+        (item) =>
+          normalizeCategoryName(item) === normalized && item !== editingCategory.name,
+      )
+    ) {
+      setCategoryFeedback({ type: 'error', text: 'ชื่อซ้ำกับหมวดหมู่ที่มีอยู่แล้ว' })
+      return
+    }
+
+    setCategories((prev) => ({
+      ...prev,
+      [editingCategory.type]: prev[editingCategory.type].map((item) =>
+        item === editingCategory.name ? nextName : item,
+      ),
+    }))
+
+    setTransactions((prev) =>
+      prev.map((transaction) =>
+        transaction.type === editingCategory.type && transaction.category === editingCategory.name
+          ? { ...transaction, category: nextName }
+          : transaction,
+      ),
+    )
+
+    setLastCategories((prev) => ({
+      ...prev,
+      [editingCategory.type]:
+        prev[editingCategory.type] === editingCategory.name
+          ? nextName
+          : prev[editingCategory.type],
+    }))
+
+    setFormData((prev) =>
+      prev.type === editingCategory.type && prev.category === editingCategory.name
+        ? { ...prev, category: nextName }
+        : prev,
+    )
+
+    if (pieFilter === editingCategory.name) {
+      setPieFilter(nextName)
+    }
+
+    setEditingCategory(null)
+    setEditingValue('')
+    setCategoryFeedback({ type: 'success', text: 'แก้ไขชื่อหมวดหมู่แล้ว' })
+  }
+
+  const handleDeleteCategory = (type, name) => {
+    if (categories[type].length <= 1) {
+      setCategoryFeedback({ type: 'error', text: 'ต้องมีหมวดหมู่อย่างน้อย 1 รายการ' })
+      return
+    }
+    const fallback = categories[type].find((item) => item !== name) || categories[type][0]
+
+    setCategories((prev) => ({
+      ...prev,
+      [type]: prev[type].filter((item) => item !== name),
+    }))
+
+    setTransactions((prev) =>
+      prev.map((transaction) =>
+        transaction.type === type && transaction.category === name
+          ? { ...transaction, category: fallback }
+          : transaction,
+      ),
+    )
+
+    setLastCategories((prev) => ({
+      ...prev,
+      [type]: prev[type] === name ? fallback : prev[type],
+    }))
+
+    setFormData((prev) =>
+      prev.type === type && prev.category === name ? { ...prev, category: fallback } : prev,
+    )
+
+    if (pieFilter === name) {
+      setPieFilter('all')
+    }
+  }
+
+  const handleImportFile = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setImportStatus(null)
+
+    try {
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      if (!sheet) {
+        setImportStatus({ type: 'error', message: 'ไม่พบชีตในไฟล์ที่เลือก' })
+        return
+      }
+
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true })
+      if (!rows.length) {
+        setImportStatus({ type: 'error', message: 'ไฟล์นี้ไม่มีข้อมูลให้นำเข้า' })
+        return
+      }
+
+      const imported = []
+      const discoveredCategories = {
+        income: new Set(),
+        expense: new Set(),
+      }
+
+      rows.forEach((row, index) => {
+        const normalizedRow = Object.entries(row).reduce((acc, [key, value]) => {
+          acc[normalizeKey(key)] = value
+          return acc
+        }, {})
+
+        const dateValue = getValueByAliases(normalizedRow, IMPORT_ALIASES.date)
+        const typeValue = getValueByAliases(normalizedRow, IMPORT_ALIASES.type)
+        const categoryValue = getValueByAliases(normalizedRow, IMPORT_ALIASES.category)
+        const amountValue = getValueByAliases(normalizedRow, IMPORT_ALIASES.amount)
+        const noteValue = getValueByAliases(normalizedRow, IMPORT_ALIASES.note)
+
+        const parsedDate = parseDateValue(dateValue)
+        const parsedAmount = parseAmount(amountValue)
+        const parsedType = parseType(typeValue) || 'expense'
+
+        if (!parsedDate || !Number.isFinite(parsedAmount) || parsedAmount === 0) {
+          return
+        }
+
+        const cleanCategory = categoryValue?.toString().trim()
+        const category = cleanCategory || categories[parsedType][0]
+        const note = noteValue ? noteValue.toString().trim() : ''
+
+        imported.push({
+          id: `${Date.now()}-${index}`,
+          date: parsedDate,
+          type: parsedType,
+          category,
+          amount: Math.abs(parsedAmount),
+          note,
+        })
+
+        discoveredCategories[parsedType].add(category)
+      })
+
+      if (!imported.length) {
+        setImportStatus({ type: 'error', message: 'ไม่พบรายการที่นำเข้าได้' })
+        return
+      }
+
+      setTransactions((prev) =>
+        [...imported, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date)),
+      )
+
+      setCategories((prev) => ({
+        income: dedupeCategories([...prev.income, ...discoveredCategories.income]),
+        expense: dedupeCategories([...prev.expense, ...discoveredCategories.expense]),
+      }))
+
+      setImportStatus({
+        type: 'success',
+        message: `นำเข้า ${imported.length} รายการเรียบร้อยแล้ว`,
+      })
+    } catch {
+      setImportStatus({ type: 'error', message: 'เกิดข้อผิดพลาดระหว่างนำเข้าไฟล์' })
+    } finally {
+      event.target.value = ''
+    }
   }
 
   // --- Derived Data ---
@@ -233,6 +657,54 @@ export default function App() {
       .sort((a, b) => b.value - a.value)
   }, [filteredTransactions])
 
+  const pieData = useMemo(() => {
+    if (pieFilter === 'all') return expensesByCategory
+    return expensesByCategory.filter((item) => item.name === pieFilter)
+  }, [expensesByCategory, pieFilter])
+
+  const pieTotal = useMemo(
+    () => pieData.reduce((sum, item) => sum + item.value, 0),
+    [pieData],
+  )
+
+  const pieSlices = useMemo(() => buildPieSlices(pieData, pieTotal, PIE_COLORS), [pieData, pieTotal])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ transactions, categories, lastCategories }),
+    )
+  }, [transactions, categories, lastCategories])
+
+  useEffect(() => {
+    setLastCategories((prev) => {
+      const next = { ...prev }
+      let changed = false
+      ;['income', 'expense'].forEach((type) => {
+        if (!categories[type].includes(next[type])) {
+          next[type] = categories[type][0]
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [categories])
+
+  useEffect(() => {
+    setFormData((prev) =>
+      categories[prev.type].includes(prev.category)
+        ? prev
+        : { ...prev, category: categories[prev.type][0] },
+    )
+  }, [categories])
+
+  useEffect(() => {
+    if (pieFilter !== 'all' && !expensesByCategory.some((item) => item.name === pieFilter)) {
+      setPieFilter('all')
+    }
+  }, [expensesByCategory, pieFilter])
+
   // --- Formatters & Helpers ---
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(
@@ -253,9 +725,6 @@ export default function App() {
     'พฤศจิกายน',
     'ธันวาคม',
   ]
-
-  // High contrast expense bar colors (Strictly semantic)
-  const barColors = ['#BA343B', '#d96b6b', '#f0a3a7']
 
   // --- Render ---
   return (
@@ -315,11 +784,11 @@ export default function App() {
         {/* KPI Section: Friendly Visual Hierarchy */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           {/* HERO: Balance - Brand Signature Background */}
-          <div className="md:col-span-6 lg:col-span-8 bg-gradient-to-br from-[var(--paper)] to-[var(--paper-soft)] rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#f2e6b1]/60 flex flex-col justify-center relative overflow-hidden">
+          <div className="md:col-span-6 lg:col-span-8 bg-gradient-to-br from-[#ba343b]/15 to-[#f2e6b1] rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#ba343b]/20 flex flex-col justify-center relative overflow-hidden">
             {/* Subtle radial texture */}
             <div
               className="absolute inset-0 opacity-[0.15] pointer-events-none"
-              style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, #BA343B22 0%, transparent 40%)' }}
+              style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, #BA343B22 0%, transparent 45%)' }}
             />
             {/* Corner Watercolor Decor */}
             <div className="absolute -bottom-16 -right-16 w-64 h-64 pointer-events-none">
@@ -367,7 +836,7 @@ export default function App() {
         {/* Main Content Area */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column: Form */}
-          <div className="lg:col-span-5 xl:col-span-4">
+          <div className="lg:col-span-5 xl:col-span-4 space-y-6">
             <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[var(--paper-soft)] lg:sticky lg:top-20 relative overflow-hidden">
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50 relative z-10">
                 <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-700">
@@ -450,7 +919,7 @@ export default function App() {
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 bg-[var(--paper)] border border-[var(--paper-soft)] rounded-2xl focus:ring-4 focus:ring-[#f2e6b1]/60 focus:border-[var(--paper-soft)] outline-none appearance-none text-gray-700 font-medium transition-all"
                   >
-                    {CATEGORIES[formData.type].map((category) => (
+                    {categories[formData.type].map((category) => (
                       <option key={category} value={category}>
                         {category}
                       </option>
@@ -504,43 +973,271 @@ export default function App() {
                 </button>
               </form>
             </div>
+
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[var(--paper-soft)]">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold flex items-center gap-2 text-gray-700">
+                  <FileUp className="w-4 h-4 text-[#ba343b]/70" />
+                  นำเข้าไฟล์ Excel
+                </h2>
+              </div>
+              <div>
+                <input
+                  id="import-file"
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleImportFile}
+                  className="sr-only"
+                />
+                <label
+                  htmlFor="import-file"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-[var(--paper-soft)] bg-[var(--paper)] text-sm font-semibold text-[#ba343b] hover:bg-[#f2e6b1]/40 transition-all cursor-pointer"
+                >
+                  <FileUp className="w-4 h-4" /> เลือกไฟล์ .xlsx / .csv
+                </label>
+                <p className="text-xs text-gray-400 mt-3">
+                  รองรับคอลัมน์: date, type, category, amount, note (หรือชื่อภาษาไทย)
+                </p>
+                {importStatus && (
+                  <p
+                    className={`text-xs mt-3 font-medium ${
+                      importStatus.type === 'success' ? 'text-green-600' : 'text-[#ba343b]'
+                    }`}
+                  >
+                    {importStatus.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[var(--paper-soft)]">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold flex items-center gap-2 text-gray-700">
+                  <Pencil className="w-4 h-4 text-[#ba343b]/70" />
+                  จัดการหมวดหมู่
+                </h2>
+              </div>
+
+              <div className="flex bg-[#f2e6b1]/30 rounded-2xl p-1 border border-[#f2e6b1]/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryTab('expense')
+                    setCategoryFeedback(null)
+                  }}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
+                    categoryTab === 'expense'
+                      ? 'bg-white shadow-sm text-[var(--berry)]'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  รายจ่าย
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryTab('income')
+                    setCategoryFeedback(null)
+                  }}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
+                    categoryTab === 'income'
+                      ? 'bg-white shadow-sm text-green-600'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  รายรับ
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-xs font-medium text-gray-400 mb-1.5 uppercase tracking-wider">
+                  เพิ่มหมวดหมู่ใหม่ (ใส่ emoji ได้)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={categoryDraft}
+                    onChange={(event) => {
+                      setCategoryDraft(event.target.value)
+                      setCategoryFeedback(null)
+                    }}
+                    placeholder="เช่น 🍣 อาหารญี่ปุ่น"
+                    className="flex-1 px-4 py-3 bg-[var(--paper)] border border-[var(--paper-soft)] rounded-2xl focus:ring-4 focus:ring-[#f2e6b1]/60 focus:border-[var(--paper-soft)] outline-none text-sm transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCategory}
+                    className="px-3 py-3 rounded-2xl bg-[var(--berry)] text-white hover:bg-[var(--berry-deep)] transition-all"
+                    aria-label="เพิ่มหมวดหมู่"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                  </button>
+                </div>
+                {categoryFeedback && (
+                  <p
+                    className={`text-xs mt-2 font-medium ${
+                      categoryFeedback.type === 'success' ? 'text-green-600' : 'text-[#ba343b]'
+                    }`}
+                  >
+                    {categoryFeedback.text}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {categories[categoryTab].map((category) => {
+                  const isEditing =
+                    editingCategory?.type === categoryTab && editingCategory?.name === category
+                  return (
+                    <div
+                      key={category}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-2xl border border-[#f2e6b1]/50 bg-[var(--paper)]"
+                    >
+                      {isEditing ? (
+                        <div className="flex-1 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editingValue}
+                            onChange={(event) => setEditingValue(event.target.value)}
+                            className="flex-1 px-3 py-2 bg-white border border-[var(--paper-soft)] rounded-xl focus:ring-4 focus:ring-[#f2e6b1]/60 focus:border-[var(--paper-soft)] outline-none text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveEditCategory}
+                            className="p-2 rounded-xl bg-[#f2e6b1]/70 text-[#ba343b] hover:bg-[#f2e6b1] transition-all"
+                            aria-label="บันทึกชื่อใหม่"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditCategory}
+                            className="p-2 rounded-xl bg-white text-gray-400 hover:text-[#ba343b] border border-[#f2e6b1]/60 transition-all"
+                            aria-label="ยกเลิก"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-gray-700">{category}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditCategory(categoryTab, category)}
+                              className="p-2 rounded-xl text-gray-400 hover:text-[#ba343b] hover:bg-[#ba343b]/10 transition-all"
+                              aria-label="แก้ไขหมวดหมู่"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(categoryTab, category)}
+                              className="p-2 rounded-xl text-gray-300 hover:text-[#ba343b] hover:bg-[#ba343b]/10 transition-all"
+                              aria-label="ลบหมวดหมู่"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
           {/* Right Column: Dashboard & List */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6">
             {/* Expense Breakdown */}
             <div className="bg-white rounded-3xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[#f2e6b1]/80">
-              <h2 className="text-base font-semibold mb-5 flex items-center gap-2 text-gray-700">
-                สัดส่วนค่าใช้จ่ายเดือนนี้
-              </h2>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+                <h2 className="text-base font-semibold flex items-center gap-2 text-gray-700">
+                  สัดส่วนค่าใช้จ่ายเดือนนี้
+                </h2>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <PieChart className="w-4 h-4 text-[#ba343b]/70" />
+                  <select
+                    value={pieFilter}
+                    onChange={(event) => setPieFilter(event.target.value)}
+                    disabled={expensesByCategory.length === 0}
+                    className="px-3 py-2 rounded-full border border-[#f2e6b1]/70 bg-[var(--paper)] text-gray-600 text-xs font-medium focus:ring-4 focus:ring-[#f2e6b1]/50 focus:border-[#f2e6b1]/70 outline-none"
+                  >
+                    <option value="all">ภาพรวมทั้งหมด</option>
+                    {expensesByCategory.map((item) => (
+                      <option key={item.name} value={item.name}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
               {expensesByCategory.length > 0 ? (
-                <div className="space-y-4">
-                  {expensesByCategory.map((item, index) => {
-                    const percentage = ((item.value / totalExpense) * 100).toFixed(1)
-                    const color = barColors[index % barColors.length]
-                    return (
-                      <div key={item.name} className="group">
-                        <div className="flex justify-between text-sm mb-1.5">
-                          <span className="font-medium text-gray-500 truncate pr-4 group-hover:text-gray-700 transition-colors">
-                            {item.name}
+                <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-center">
+                  <div className="flex items-center justify-center">
+                    <svg viewBox="0 0 200 200" className="w-48 h-48" role="img">
+                      {pieSlices.length === 1 ? (
+                        <circle cx="100" cy="100" r="90" fill={pieSlices[0].color} />
+                      ) : (
+                        pieSlices.map((slice) => (
+                          <path key={slice.name} d={slice.path} fill={slice.color} />
+                        ))
+                      )}
+                      <circle cx="100" cy="100" r="55" fill="var(--paper)" />
+                      <text
+                        x="100"
+                        y="96"
+                        textAnchor="middle"
+                        className="fill-gray-700"
+                        fontSize="18"
+                        fontWeight="600"
+                      >
+                        ฿ {formatCurrency(pieTotal)}
+                      </text>
+                      <text
+                        x="100"
+                        y="120"
+                        textAnchor="middle"
+                        className="fill-gray-400"
+                        fontSize="11"
+                      >
+                        {pieFilter === 'all' ? 'รายจ่ายรวม' : 'หมวดหมู่ที่เลือก'}
+                      </text>
+                    </svg>
+                  </div>
+                  <div className="space-y-3">
+                    {pieData.map((item, index) => {
+                      const percentage = totalExpense
+                        ? ((item.value / totalExpense) * 100).toFixed(1)
+                        : '0.0'
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => setPieFilter(item.name)}
+                          className="w-full flex items-center justify-between gap-3 text-left px-3 py-2 rounded-2xl border border-[#f2e6b1]/60 bg-[var(--paper)] hover:bg-[#f2e6b1]/40 transition-all"
+                        >
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                            ></span>
+                            <span className="text-sm font-medium text-gray-600 truncate">
+                              {item.name}
+                            </span>
                           </span>
-                          <div className="text-right flex flex-col sm:flex-row sm:items-center sm:gap-3">
-                            <span className="text-xs text-gray-400 w-10 text-right">{percentage}%</span>
-                            <span className="font-semibold text-gray-700 whitespace-nowrap min-w-[80px]">
+                          <span className="text-right">
+                            <span className="text-xs text-gray-400 block">{percentage}%</span>
+                            <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
                               ฿ {formatCurrency(item.value)}
                             </span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-[#f2e6b1]/60 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-1000 ease-out"
-                            style={{ width: `${percentage}%`, backgroundColor: color }}
-                          ></div>
-                        </div>
-                      </div>
-                    )
-                  })}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-10 text-gray-400 bg-[var(--paper)] rounded-2xl border border-dashed border-[var(--paper-soft)]">
