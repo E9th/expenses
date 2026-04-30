@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Wallet,
-  CreditCard,
   TrendingDown,
   TrendingUp,
   Trash2,
@@ -234,7 +233,7 @@ const getValueByAliases = (row, aliases) => {
   return null
 }
 
-const PIE_COLORS = ['#BA343B', '#D4686E', '#E18B90', '#F0B5B8', '#B04A50', '#8F2D33']
+const PIE_COLORS = ['#FF0000', '#FF4D4D', '#FF8080', '#FFB3B3', '#CC0000', '#990000']
 
 const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
   const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0
@@ -268,29 +267,6 @@ const buildPieSlices = (data, total, colors) => {
     return slice
   })
 }
-
-// --- Decorative Components ---
-const WatercolorBlob = ({ className }) => (
-  <svg
-    viewBox="0 0 200 200"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-    style={{ mixBlendMode: 'multiply', filter: 'blur(3px)' }}
-  >
-    <path
-      fill="#BA343B"
-      fillOpacity="0.08"
-      d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,81.3,-45.8C90.8,-32.5,96.8,-16.3,95.5,-0.7C94.2,14.8,85.6,29.7,75.4,42.4C65.2,55.1,53.4,65.6,40.1,73.1C26.8,80.6,13.4,85.1,-0.5,86C-14.4,86.9,-28.8,84.1,-41.8,76.8C-54.8,69.5,-66.4,57.7,-74.6,43.7C-82.8,29.7,-87.6,13.4,-86.3,-2.3C-85,-18,-77.6,-33.1,-67.6,-45.1C-57.6,-57.1,-45,-66,-31.6,-73.2C-18.2,-80.4,-4.1,-85.9,10.6,-84.3C25.3,-82.7,40.1,-74.1,44.7,-76.4Z"
-      transform="translate(100 100)"
-    />
-    <path
-      fill="#BA343B"
-      fillOpacity="0.05"
-      d="M51.1,-63.9C65.8,-53.4,77,-37.2,80.7,-20.1C84.4,-3,80.5,15.1,72.2,30.7C63.9,46.3,51.1,59.4,36.5,67.6C21.9,75.8,5.4,79.1,-10.8,77.2C-26.9,75.3,-42.7,68.2,-55.8,57.2C-68.9,46.2,-79.3,31.2,-83.1,14.7C-86.9,-1.8,-84,-19.7,-74.7,-33.5C-65.4,-47.3,-49.7,-57.1,-34.2,-61.2C-18.7,-65.4,-3.4,-63.8,11.9,-61C27.2,-58.1,42.5,-54.1,51.1,-63.9Z"
-      transform="translate(100 100) scale(0.9) rotate(45)"
-    />
-  </svg>
-)
 
 export default function App() {
   // --- State ---
@@ -728,12 +704,7 @@ export default function App() {
 
   // --- Render ---
   return (
-    <div className="min-h-screen bg-[#f2e6b1]/40 font-sans text-gray-700 pb-20 relative overflow-hidden">
-      {/* Global Background Watercolor Decor */}
-      <div className="fixed -top-20 -right-20 w-[500px] h-[500px] pointer-events-none -z-10">
-        <WatercolorBlob className="w-full h-full" />
-      </div>
-
+    <div className="min-h-screen bg-transparent font-sans text-gray-700 pb-20 relative overflow-hidden">
       {/* Global Styles for Micro-interactions */}
       <style>{`
         @keyframes fadeSlideIn {
@@ -761,7 +732,7 @@ export default function App() {
           <div className="flex items-center gap-3 bg-[var(--paper)] rounded-full px-3 py-1.5 border border-[var(--paper-soft)]">
             <button
               onClick={() => changeMonth(-1)}
-              className="text-[#ba343b]/60 hover:text-[var(--berry)] transition-colors p-1"
+              className="text-[#ff0000]/60 hover:text-[var(--berry)] transition-colors p-1"
               aria-label="เดือนก่อนหน้า"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -771,7 +742,7 @@ export default function App() {
             </span>
             <button
               onClick={() => changeMonth(1)}
-              className="text-[#ba343b]/60 hover:text-[var(--berry)] transition-colors p-1"
+              className="text-[#ff0000]/60 hover:text-[var(--berry)] transition-colors p-1"
               aria-label="เดือนถัดไป"
             >
               <ChevronRight className="w-4 h-4" />
@@ -784,32 +755,45 @@ export default function App() {
         {/* KPI Section: Friendly Visual Hierarchy */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           {/* HERO: Balance - Brand Signature Background */}
-          <div className="md:col-span-6 lg:col-span-8 bg-gradient-to-br from-[#ba343b]/15 to-[#f2e6b1] rounded-3xl p-6 sm:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-[#ba343b]/20 flex flex-col justify-center relative overflow-hidden">
-            {/* Subtle radial texture */}
-            <div
-              className="absolute inset-0 opacity-[0.15] pointer-events-none"
-              style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, #BA343B22 0%, transparent 45%)' }}
-            />
-            {/* Corner Watercolor Decor */}
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 pointer-events-none">
-              <WatercolorBlob className="w-full h-full" />
-            </div>
+          <div className="md:col-span-6 lg:col-span-8 bg-[#f59a5b] rounded-[28px] p-6 sm:p-8 shadow-[0_18px_40px_rgba(120,60,20,0.25)] flex flex-col justify-between relative overflow-hidden min-h-[220px]">
+            <div className="absolute -right-20 -top-24 h-60 w-60 rounded-full bg-[#e97b3d]/70" />
+            <div className="absolute -left-24 -bottom-24 h-64 w-64 rounded-full bg-[#e36d33]/55" />
 
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 text-[#ba343b]/60 mb-2">
-                <CreditCard className="w-5 h-5 text-[#ba343b]/60" />
-                <span className="text-sm font-medium">ยอดเงินคงเหลือ</span>
+            <div className="relative z-10 flex h-full flex-col">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm text-white/80">Current Balance</div>
+                  <div className="mt-2 flex items-baseline gap-2">
+                    <span className="text-2xl text-white/70 font-medium">฿</span>
+                    {/* Red only if negative */}
+                    <span
+                      className={`text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight ${
+                        balance >= 0 ? 'text-white' : 'text-[var(--berry)]'
+                      }`}
+                    >
+                      {formatCurrency(balance)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center">
+                    <span className="h-8 w-8 rounded-full bg-[#ff0000]" />
+                    <span className="-ml-3 h-8 w-8 rounded-full bg-[#ffc300]" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-[0.3em] text-white/75">
+                    mastercard
+                  </span>
+                </div>
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl text-gray-400 font-medium">฿</span>
-                {/* Red only if negative */}
-                <span
-                  className={`text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight ${
-                    balance >= 0 ? 'text-gray-800' : 'text-[var(--berry)]'
-                  }`}
-                >
-                  {formatCurrency(balance)}
+
+              <div className="mt-auto flex items-end justify-between pt-8">
+                <span className="text-sm tracking-[0.25em] text-white/85">
+                  5282 3456 7890 1289
                 </span>
+                <div className="text-right text-sm font-semibold text-white/85">
+                  <div>09/25</div>
+                  <div className="mt-2">09/25</div>
+                </div>
               </div>
             </div>
           </div>
@@ -840,13 +824,75 @@ export default function App() {
             <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[var(--paper-soft)] lg:sticky lg:top-20 relative overflow-hidden">
               <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-50 relative z-10">
                 <h2 className="text-lg font-semibold flex items-center gap-2 text-gray-700">
-                  <PlusCircle className="w-5 h-5 text-[#ba343b]/60" />
+                  <PlusCircle className="w-5 h-5 text-[#ff0000]/60" />
                   บันทึกรายการ
                 </h2>
                 {/* Success Feedback - Emotional Copy & Animation */}
                 {showSuccess && (
                   <div className="success-pop absolute right-0 flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[var(--berry)] bg-[#f2e6b1]/80 px-3 py-1.5 rounded-full border border-[var(--paper-soft)]">
                     <CheckCircle2 className="w-4 h-4" /> บันทึกเรียบร้อยแล้ว 💖
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-6 rounded-2xl border border-[#f2e6b1]/70 bg-[var(--paper)] p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    ภาพรวมรายจ่าย
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <PieChart className="w-4 h-4 text-[#ff0000]/70" />
+                    <select
+                      value={pieFilter}
+                      onChange={(event) => setPieFilter(event.target.value)}
+                      disabled={expensesByCategory.length === 0}
+                      className="px-3 py-2 rounded-full border border-[#f2e6b1]/70 bg-[var(--paper)] text-gray-600 text-xs font-medium focus:ring-4 focus:ring-[#f2e6b1]/50 focus:border-[#f2e6b1]/70 outline-none"
+                    >
+                      <option value="all">ภาพรวมทั้งหมด</option>
+                      {expensesByCategory.map((item) => (
+                        <option key={item.name} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {expensesByCategory.length > 0 ? (
+                  <div className="flex items-center justify-center mt-4">
+                    <svg viewBox="0 0 200 200" className="w-48 h-48" role="img">
+                      {pieSlices.length === 1 ? (
+                        <circle cx="100" cy="100" r="90" fill={pieSlices[0].color} />
+                      ) : (
+                        pieSlices.map((slice) => (
+                          <path key={slice.name} d={slice.path} fill={slice.color} />
+                        ))
+                      )}
+                      <circle cx="100" cy="100" r="55" fill="var(--paper)" />
+                      <text
+                        x="100"
+                        y="96"
+                        textAnchor="middle"
+                        className="fill-gray-700"
+                        fontSize="18"
+                        fontWeight="600"
+                      >
+                        ฿ {formatCurrency(pieTotal)}
+                      </text>
+                      <text
+                        x="100"
+                        y="120"
+                        textAnchor="middle"
+                        className="fill-gray-400"
+                        fontSize="11"
+                      >
+                        {pieFilter === 'all' ? 'รายจ่ายรวม' : 'หมวดหมู่ที่เลือก'}
+                      </text>
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="mt-4 text-center text-xs text-gray-400 py-6 border border-dashed border-[#f2e6b1]/70 rounded-2xl">
+                    ยังไม่มีรายจ่ายเดือนนี้เลยนะ 🌼
                   </div>
                 )}
               </div>
@@ -966,7 +1012,7 @@ export default function App() {
                   className={`w-full py-4 text-white rounded-2xl font-semibold tracking-wide transition-all duration-200 active:scale-95 mt-2 ${
                     formData.type === 'income'
                       ? 'bg-green-500 hover:bg-green-600 shadow-[0_8px_20px_rgba(34,197,94,0.25)]'
-                      : 'bg-[var(--berry)] hover:bg-[var(--berry-deep)] shadow-[0_8px_20px_rgba(186,52,59,0.25)]'
+                      : 'bg-[var(--berry)] hover:bg-[var(--berry-deep)] shadow-[0_8px_20px_rgba(255,0,0,0.25)]'
                   }`}
                 >
                   บันทึก{formData.type === 'income' ? 'รายรับ' : 'รายจ่าย'}
@@ -977,7 +1023,7 @@ export default function App() {
             <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[var(--paper-soft)]">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold flex items-center gap-2 text-gray-700">
-                  <FileUp className="w-4 h-4 text-[#ba343b]/70" />
+                  <FileUp className="w-4 h-4 text-[#ff0000]/70" />
                   นำเข้าไฟล์ Excel
                 </h2>
               </div>
@@ -991,7 +1037,7 @@ export default function App() {
                 />
                 <label
                   htmlFor="import-file"
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-[var(--paper-soft)] bg-[var(--paper)] text-sm font-semibold text-[#ba343b] hover:bg-[#f2e6b1]/40 transition-all cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl border border-[var(--paper-soft)] bg-[var(--paper)] text-sm font-semibold text-[#ff0000] hover:bg-[#f2e6b1]/40 transition-all cursor-pointer"
                 >
                   <FileUp className="w-4 h-4" /> เลือกไฟล์ .xlsx / .csv
                 </label>
@@ -1001,7 +1047,7 @@ export default function App() {
                 {importStatus && (
                   <p
                     className={`text-xs mt-3 font-medium ${
-                      importStatus.type === 'success' ? 'text-green-600' : 'text-[#ba343b]'
+                      importStatus.type === 'success' ? 'text-green-600' : 'text-[#ff0000]'
                     }`}
                   >
                     {importStatus.message}
@@ -1013,7 +1059,7 @@ export default function App() {
             <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[var(--paper-soft)]">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold flex items-center gap-2 text-gray-700">
-                  <Pencil className="w-4 h-4 text-[#ba343b]/70" />
+                  <Pencil className="w-4 h-4 text-[#ff0000]/70" />
                   จัดการหมวดหมู่
                 </h2>
               </div>
@@ -1076,7 +1122,7 @@ export default function App() {
                 {categoryFeedback && (
                   <p
                     className={`text-xs mt-2 font-medium ${
-                      categoryFeedback.type === 'success' ? 'text-green-600' : 'text-[#ba343b]'
+                      categoryFeedback.type === 'success' ? 'text-green-600' : 'text-[#ff0000]'
                     }`}
                   >
                     {categoryFeedback.text}
@@ -1104,7 +1150,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={handleSaveEditCategory}
-                            className="p-2 rounded-xl bg-[#f2e6b1]/70 text-[#ba343b] hover:bg-[#f2e6b1] transition-all"
+                            className="p-2 rounded-xl bg-[#f2e6b1]/70 text-[#ff0000] hover:bg-[#f2e6b1] transition-all"
                             aria-label="บันทึกชื่อใหม่"
                           >
                             <Check className="w-4 h-4" />
@@ -1112,7 +1158,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={handleCancelEditCategory}
-                            className="p-2 rounded-xl bg-white text-gray-400 hover:text-[#ba343b] border border-[#f2e6b1]/60 transition-all"
+                            className="p-2 rounded-xl bg-white text-gray-400 hover:text-[#ff0000] border border-[#f2e6b1]/60 transition-all"
                             aria-label="ยกเลิก"
                           >
                             <X className="w-4 h-4" />
@@ -1125,7 +1171,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => handleStartEditCategory(categoryTab, category)}
-                              className="p-2 rounded-xl text-gray-400 hover:text-[#ba343b] hover:bg-[#ba343b]/10 transition-all"
+                              className="p-2 rounded-xl text-gray-400 hover:text-[#ff0000] hover:bg-[#ff0000]/10 transition-all"
                               aria-label="แก้ไขหมวดหมู่"
                             >
                               <Pencil className="w-4 h-4" />
@@ -1133,7 +1179,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => handleDeleteCategory(categoryTab, category)}
-                              className="p-2 rounded-xl text-gray-300 hover:text-[#ba343b] hover:bg-[#ba343b]/10 transition-all"
+                              className="p-2 rounded-xl text-gray-300 hover:text-[#ff0000] hover:bg-[#ff0000]/10 transition-all"
                               aria-label="ลบหมวดหมู่"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1152,92 +1198,43 @@ export default function App() {
           <div className="lg:col-span-7 xl:col-span-8 space-y-6">
             {/* Expense Breakdown */}
             <div className="bg-white rounded-3xl p-6 shadow-[0_8px_20px_rgba(0,0,0,0.04)] border border-[#f2e6b1]/80">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+              <div className="flex items-center justify-between mb-5">
                 <h2 className="text-base font-semibold flex items-center gap-2 text-gray-700">
                   สัดส่วนค่าใช้จ่ายเดือนนี้
                 </h2>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <PieChart className="w-4 h-4 text-[#ba343b]/70" />
-                  <select
-                    value={pieFilter}
-                    onChange={(event) => setPieFilter(event.target.value)}
-                    disabled={expensesByCategory.length === 0}
-                    className="px-3 py-2 rounded-full border border-[#f2e6b1]/70 bg-[var(--paper)] text-gray-600 text-xs font-medium focus:ring-4 focus:ring-[#f2e6b1]/50 focus:border-[#f2e6b1]/70 outline-none"
-                  >
-                    <option value="all">ภาพรวมทั้งหมด</option>
-                    {expensesByCategory.map((item) => (
-                      <option key={item.name} value={item.name}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
               {expensesByCategory.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-center">
-                  <div className="flex items-center justify-center">
-                    <svg viewBox="0 0 200 200" className="w-48 h-48" role="img">
-                      {pieSlices.length === 1 ? (
-                        <circle cx="100" cy="100" r="90" fill={pieSlices[0].color} />
-                      ) : (
-                        pieSlices.map((slice) => (
-                          <path key={slice.name} d={slice.path} fill={slice.color} />
-                        ))
-                      )}
-                      <circle cx="100" cy="100" r="55" fill="var(--paper)" />
-                      <text
-                        x="100"
-                        y="96"
-                        textAnchor="middle"
-                        className="fill-gray-700"
-                        fontSize="18"
-                        fontWeight="600"
+                <div className="space-y-3">
+                  {pieData.map((item, index) => {
+                    const percentage = totalExpense
+                      ? ((item.value / totalExpense) * 100).toFixed(1)
+                      : '0.0'
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => setPieFilter(item.name)}
+                        className="w-full flex items-center justify-between gap-3 text-left px-3 py-2 rounded-2xl border border-[#f2e6b1]/60 bg-[var(--paper)] hover:bg-[#f2e6b1]/40 transition-all"
                       >
-                        ฿ {formatCurrency(pieTotal)}
-                      </text>
-                      <text
-                        x="100"
-                        y="120"
-                        textAnchor="middle"
-                        className="fill-gray-400"
-                        fontSize="11"
-                      >
-                        {pieFilter === 'all' ? 'รายจ่ายรวม' : 'หมวดหมู่ที่เลือก'}
-                      </text>
-                    </svg>
-                  </div>
-                  <div className="space-y-3">
-                    {pieData.map((item, index) => {
-                      const percentage = totalExpense
-                        ? ((item.value / totalExpense) * 100).toFixed(1)
-                        : '0.0'
-                      return (
-                        <button
-                          key={item.name}
-                          type="button"
-                          onClick={() => setPieFilter(item.name)}
-                          className="w-full flex items-center justify-between gap-3 text-left px-3 py-2 rounded-2xl border border-[#f2e6b1]/60 bg-[var(--paper)] hover:bg-[#f2e6b1]/40 transition-all"
-                        >
-                          <span className="flex items-center gap-2 min-w-0">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
-                            ></span>
-                            <span className="text-sm font-medium text-gray-600 truncate">
-                              {item.name}
-                            </span>
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                          ></span>
+                          <span className="text-sm font-medium text-gray-600 truncate">
+                            {item.name}
                           </span>
-                          <span className="text-right">
-                            <span className="text-xs text-gray-400 block">{percentage}%</span>
-                            <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
-                              ฿ {formatCurrency(item.value)}
-                            </span>
+                        </span>
+                        <span className="text-right">
+                          <span className="text-xs text-gray-400 block">{percentage}%</span>
+                          <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+                            ฿ {formatCurrency(item.value)}
                           </span>
-                        </button>
-                      )
-                    })}
-                  </div>
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-10 text-gray-400 bg-[var(--paper)] rounded-2xl border border-dashed border-[var(--paper-soft)]">
@@ -1291,7 +1288,7 @@ export default function App() {
                           </p>
                           <button
                             onClick={() => handleDelete(transaction.id)}
-                            className="mt-2 inline-flex items-center justify-center p-2 text-gray-300 hover:text-[var(--berry)] hover:bg-[#ba343b]/10 rounded-xl transition-all"
+                            className="mt-2 inline-flex items-center justify-center p-2 text-gray-300 hover:text-[var(--berry)] hover:bg-[#ff0000]/10 rounded-xl transition-all"
                             title="ลบรายการ"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1301,7 +1298,7 @@ export default function App() {
                     </div>
                   ))
                 ) : (
-                  <div className="py-8 text-center text-[#ba343b]/60 bg-[var(--paper)] rounded-2xl border border-dashed border-[var(--paper-soft)]">
+                  <div className="py-8 text-center text-[#ff0000]/60 bg-[var(--paper)] rounded-2xl border border-dashed border-[var(--paper-soft)]">
                     <span className="text-sm">ลองเพิ่มรายการแรกกันเลย ✨</span>
                   </div>
                 )}
@@ -1357,7 +1354,7 @@ export default function App() {
                           <td className="py-4 px-4 text-center">
                             <button
                               onClick={() => handleDelete(transaction.id)}
-                              className="p-2 text-gray-300 hover:text-[var(--berry)] hover:bg-[#ba343b]/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              className="p-2 text-gray-300 hover:text-[var(--berry)] hover:bg-[#ff0000]/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
                               title="ลบรายการ"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1367,7 +1364,7 @@ export default function App() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="5" className="py-12 text-center text-[#ba343b]/60 bg-[var(--paper)]">
+                        <td colSpan="5" className="py-12 text-center text-[#ff0000]/60 bg-[var(--paper)]">
                           <span className="text-sm">ลองเพิ่มรายการแรกกันเลย ✨</span>
                         </td>
                       </tr>

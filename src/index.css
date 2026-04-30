@@ -3,16 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --paper: #fffdf5;
+  --paper: #fffef7;
   --paper-soft: #f2e6b1;
-  --berry: #ba343b;
-  --berry-deep: #a22c32;
+  --berry: #ff0000;
+  --berry-deep: #cc0000;
   --ink: #3f3638;
   --muted: #7b6f73;
-  --wash:
-    radial-gradient(circle at 12% 10%, rgba(186, 52, 59, 0.08), transparent 45%),
-    radial-gradient(circle at 90% 0%, rgba(242, 230, 177, 0.5), transparent 50%),
-    linear-gradient(180deg, #fffef8 0%, #f6ecd0 100%);
+  --wash: #feffb5;
 }
 
 * {
@@ -34,5 +31,5 @@ body {
 }
 
 ::selection {
-  background: rgba(186, 52, 59, 0.2);
+  background: rgba(255, 0, 0, 0.2);
 }
